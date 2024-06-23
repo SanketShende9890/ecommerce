@@ -1,6 +1,6 @@
 import React from 'react'
 import Navbar from '../features/navbar/Navbar'
-import ProductDetail from '../features/product-list/component/ProductDetail'
+import ProductDetail from '../features/productDetails/component/ProductDetail'
 
 const ProductDetailPage = () => {
   return (

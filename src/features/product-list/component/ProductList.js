@@ -1,6 +1,4 @@
-import React, { useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { increment, incrementAsync, selectCount } from "../productListSlice";
+import React, { useEffect, useState } from "react";
 import { Fragment } from "react";
 import { Dialog, Disclosure, Menu, Transition } from "@headlessui/react";
 import {
@@ -14,59 +12,29 @@ import {
   MinusIcon,
   PlusIcon,
   Squares2X2Icon,
+  StarIcon,
 } from "@heroicons/react/20/solid";
 import { Link } from "react-router-dom";
 
+import { useSelector, useDispatch } from "react-redux";
+import {
+  fetchAllProductsAsync,
+  fetchAllProductsByCategoryAsync,
+  fetchAllProductsBySortAsync,
+  productByBrand,
+  selectAllProducts,
+  selectProductsStatus,
+} from "../productListSlice";
+import {
+  getAllProductCategory,
+  selectAllCategory,
+} from "../productCategorySlice";
+
 const sortOptions = [
-  { name: "Most Popular", href: "#", current: true },
-  { name: "Best Rating", href: "#", current: false },
-  { name: "Newest", href: "#", current: false },
-  { name: "Price: Low to High", href: "#", current: false },
-  { name: "Price: High to Low", href: "#", current: false },
-];
-const subCategories = [
-  { name: "Totes", href: "#" },
-  { name: "Backpacks", href: "#" },
-  { name: "Travel Bags", href: "#" },
-  { name: "Hip Bags", href: "#" },
-  { name: "Laptop Sleeves", href: "#" },
-];
-const filters = [
-  {
-    id: "color",
-    name: "Color",
-    options: [
-      { value: "white", label: "White", checked: false },
-      { value: "beige", label: "Beige", checked: false },
-      { value: "blue", label: "Blue", checked: true },
-      { value: "brown", label: "Brown", checked: false },
-      { value: "green", label: "Green", checked: false },
-      { value: "purple", label: "Purple", checked: false },
-    ],
-  },
-  {
-    id: "category",
-    name: "Category",
-    options: [
-      { value: "new-arrivals", label: "New Arrivals", checked: false },
-      { value: "sale", label: "Sale", checked: false },
-      { value: "travel", label: "Travel", checked: true },
-      { value: "organization", label: "Organization", checked: false },
-      { value: "accessories", label: "Accessories", checked: false },
-    ],
-  },
-  {
-    id: "size",
-    name: "Size",
-    options: [
-      { value: "2l", label: "2L", checked: false },
-      { value: "6l", label: "6L", checked: false },
-      { value: "12l", label: "12L", checked: false },
-      { value: "18l", label: "18L", checked: false },
-      { value: "20l", label: "20L", checked: false },
-      { value: "40l", label: "40L", checked: true },
-    ],
-  },
+  { name: "Best Rating", value: "rating", current: false },
+  { name: "Newest", value: "new", current: false },
+  { name: "Price: Low to High", value: "price_asc", current: false },
+  { name: "Price: High to Low", value: "price_desc", current: false },
 ];
 
 function classNames(...classes) {
@@ -74,60 +42,82 @@ function classNames(...classes) {
 }
 
 export default function ProductList() {
-  const products = [
-    {
-      id: 1,
-      name: "Basic Tee",
-      href: "#",
-      imageSrc:
-        "https://tailwindui.com/img/ecommerce-images/product-page-01-related-product-01.jpg",
-      imageAlt: "Front of men's Basic Tee in black.",
-      price: "$35",
-      color: "Black",
-    },
-    {
-      id: 2,
-      name: "Basic Tee",
-      href: "#",
-      imageSrc:
-        "https://tailwindui.com/img/ecommerce-images/product-page-01-related-product-01.jpg",
-      imageAlt: "Front of men's Basic Tee in black.",
-      price: "$35",
-      color: "Black",
-    },
-    {
-      id: 3,
-      name: "Basic Tee",
-      href: "#",
-      imageSrc:
-        "https://tailwindui.com/img/ecommerce-images/product-page-01-related-product-01.jpg",
-      imageAlt: "Front of men's Basic Tee in black.",
-      price: "$35",
-      color: "Black",
-    },
-    {
-      id: 4,
-      name: "Basic Tee",
-      href: "#",
-      imageSrc:
-        "https://tailwindui.com/img/ecommerce-images/product-page-01-related-product-01.jpg",
-      imageAlt: "Front of men's Basic Tee in black.",
-      price: "$35",
-      color: "Black",
-    },
-    {
-      id: 5,
-      name: "Basic Tee",
-      href: "#",
-      imageSrc:
-        "https://tailwindui.com/img/ecommerce-images/product-page-01-related-product-01.jpg",
-      imageAlt: "Front of men's Basic Tee in black.",
-      price: "$35",
-      color: "Black",
-    },
-    // More products...
-  ];
+  const dispatch = useDispatch();
+
+  // All Products list
+  const products = useSelector(selectAllProducts);
+  const category = useSelector(selectAllCategory);
+  const productStatus = useSelector(selectProductsStatus);
+  const brands = products.filter((p) => p.brand);
+  const uniqueBrands = [...new Set(brands?.map((p) => p.brand))];
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  const filters = [
+    {
+      id: "category",
+      name: "Category",
+      options: category?.map((item, index) => ({
+        value: item,
+        label: item,
+        checked: false,
+        id: item?.id || index,
+      })),
+    },
+    {
+      id: "brands",
+      name: "Brands",
+      options: uniqueBrands?.map((item, index) => ({
+        value: item,
+        label: item,
+        checked: false,
+        id: index,
+      })),
+    },
+  ];
+
+  const handleFilters = (section, option) => {
+    if (section.id === "category") {
+      dispatch(fetchAllProductsByCategoryAsync(option.value));
+    } else if (section.id === "brands") {
+      const filteredProduct = products?.filter(
+        (p) => p.brand?.toLowerCase() === option.value?.toLowerCase()
+      );
+      dispatch(productByBrand(filteredProduct));
+    }
+  };
+
+  const handleSort = (e) => {
+    const sortValue = e.target.getAttribute("data-value");
+    const asc = "asc";
+    const desc = "desc";
+
+    switch (sortValue) {
+      case "rating":
+        dispatch(fetchAllProductsBySortAsync({ sort: "rating", order: asc }));
+        break;
+      case "new":
+        dispatch(
+          fetchAllProductsBySortAsync({ sort: "createdAt", order: asc })
+        );
+        break;
+      case "price_asc":
+        dispatch(fetchAllProductsBySortAsync({ sort: "price", order: asc }));
+        break;
+      case "price_desc":
+        dispatch(fetchAllProductsBySortAsync({ sort: "price", order: desc }));
+        break;
+      default:
+        break;
+    }
+
+    console.log(sortValue);
+  };
+
+  useEffect(() => {
+    dispatch(fetchAllProductsAsync());
+    dispatch(getAllProductCategory());
+  }, [dispatch]);
 
   return (
     <div>
@@ -180,20 +170,7 @@ export default function ProductList() {
                     {/* Filters */}
                     <form className="mt-4 border-t border-gray-200">
                       <h3 className="sr-only">Categories</h3>
-                      <ul
-                        role="list"
-                        className="px-2 py-3 font-medium text-gray-900"
-                      >
-                        {subCategories.map((category) => (
-                          <li key={category.name}>
-                            <a href={category.href} className="block px-2 py-3">
-                              {category.name}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-
-                      {filters.map((section) => (
+                      {filters?.map((section) => (
                         <Disclosure
                           as="div"
                           key={section.id}
@@ -223,17 +200,19 @@ export default function ProductList() {
                               </h3>
                               <Disclosure.Panel className="pt-6">
                                 <div className="space-y-6">
-                                  {section.options.map((option, optionIdx) => (
+                                  {section.options?.map((option, optionIdx) => (
                                     <div
                                       key={option.value}
                                       className="flex items-center"
                                     >
                                       <input
-                                        id={`filter-mobile-${section.id}-${optionIdx}`}
-                                        name={`${section.id}[]`}
+                                        name="mobile-filters"
                                         defaultValue={option.value}
-                                        type="checkbox"
+                                        type="radio"
                                         defaultChecked={option.checked}
+                                        onChange={(e) =>
+                                          handleFilters(section, option)
+                                        }
                                         className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                       />
                                       <label
@@ -283,11 +262,12 @@ export default function ProductList() {
                   >
                     <Menu.Items className="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none">
                       <div className="py-1">
-                        {sortOptions.map((option) => (
+                        {sortOptions?.map((option) => (
                           <Menu.Item key={option.name}>
                             {({ active }) => (
-                              <a
-                                href={option.href}
+                              <p
+                                data-value={option.value}
+                                onClick={(e) => handleSort(e)}
                                 className={classNames(
                                   option.current
                                     ? "font-medium text-gray-900"
@@ -297,7 +277,7 @@ export default function ProductList() {
                                 )}
                               >
                                 {option.name}
-                              </a>
+                              </p>
                             )}
                           </Menu.Item>
                         ))}
@@ -331,18 +311,7 @@ export default function ProductList() {
                 {/* Filters */}
                 <form className="hidden lg:block">
                   <h3 className="sr-only">Categories</h3>
-                  <ul
-                    role="list"
-                    className="space-y-4 border-b border-gray-200 pb-6 text-sm font-medium text-gray-900"
-                  >
-                    {subCategories.map((category) => (
-                      <li key={category.name}>
-                        <a href={category.href}>{category.name}</a>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {filters.map((section) => (
+                  {filters?.map((section) => (
                     <Disclosure
                       as="div"
                       key={section.id}
@@ -372,21 +341,22 @@ export default function ProductList() {
                           </h3>
                           <Disclosure.Panel className="pt-6">
                             <div className="space-y-4">
-                              {section.options.map((option, optionIdx) => (
+                              {section.options?.map((option, optionIdx) => (
                                 <div
                                   key={option.value}
                                   className="flex items-center"
                                 >
                                   <input
-                                    id={`filter-${section.id}-${optionIdx}`}
-                                    name={`${section.id}[]`}
+                                    name="filters"
                                     defaultValue={option.value}
-                                    type="checkbox"
-                                    defaultChecked={option.checked}
+                                    type="radio"
+                                    onChange={(e) =>
+                                      handleFilters(section, option)
+                                    }
                                     className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                   />
                                   <label
-                                    htmlFor={`filter-${section.id}-${optionIdx}`}
+                                    // htmlFor={`filter-${section.id}-${optionIdx}`}
                                     className="ml-3 text-sm text-gray-600"
                                   >
                                     {option.label}
@@ -405,39 +375,56 @@ export default function ProductList() {
                 <div className="lg:col-span-3">
                   <div className="bg-white">
                     <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:max-w-7xl lg:px-8">
-                      <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
-                        {products.map((product) => (
-                          <Link to="product-detail">
-                            <div key={product.id} className="group relative">
-                              <div className="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-md bg-gray-200 lg:aspect-none group-hover:opacity-75 lg:h-80">
-                                <img
-                                  src={product.imageSrc}
-                                  alt={product.imageAlt}
-                                  className="h-full w-full object-cover object-center lg:h-full lg:w-full"
-                                />
-                              </div>
-                              <div className="mt-4 flex justify-between">
-                                <div>
-                                  <h3 className="text-sm text-gray-700">
-                                    <a href={product.href}>
-                                      <span
-                                        aria-hidden="true"
-                                        className="absolute inset-0"
-                                      />
-                                      {product.name}
-                                    </a>
-                                  </h3>
-                                  <p className="mt-1 text-sm text-gray-500">
-                                    {product.color}
-                                  </p>
+                      <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:gap-x-6">
+                        {productStatus === "loading" ? (
+                          <div>Loading...</div>
+                        ) : productStatus === "idle" ? (
+                          products?.map((product, index) => (
+                            <Link
+                              key={index}
+                              to={`product-detail/${product.id}`}
+                            >
+                              <div key={product.id} className="group relative">
+                                <div className="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-md bg-gray-200 lg:aspect-none group-hover:opacity-75 lg:h-80">
+                                  <img
+                                    src={product.thumbnail}
+                                    alt={product.title}
+                                    className="h-full w-full object-cover object-center lg:h-full lg:w-full"
+                                  />
                                 </div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {product.price}
-                                </p>
+                                <div className="mt-4 flex justify-between">
+                                  <div>
+                                    <h3 className="text-sm font-bold text-gray-900">
+                                      <p>
+                                        <span
+                                          aria-hidden="true"
+                                          className="absolute inset-0"
+                                        />
+                                        {product.title}
+                                      </p>
+                                    </h3>
+                                    <p className="flex items-center text-sm mt-1">
+                                      <StarIcon className="w-4 h-4 mr-1 text-yellow-400" />
+                                      {product.rating}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-bold text-sm text-gray-900">
+                                      ${" "}
+                                      {Math.round(
+                                        product.price *
+                                          (1 - product.discountPercentage / 100)
+                                      )}
+                                    </p>
+                                    <p className="font-medium line-through mt-1 text-sm text-gray-500">
+                                      $ {product.price}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </Link>
-                        ))}
+                            </Link>
+                          ))
+                        ) : null}
                       </div>
                     </div>
                   </div>
